@@ -80,12 +80,22 @@ option x p =
         case str of
             [] -> Just (x,[])
             _ -> case runParser p str of
-                Just (a, rest) -> Just (a, rest)
+                Just (a, rest) ->  Just (a, rest)
                 Nothing         -> Just (x, str)
 
 
--- choice :: [Parser a] -> Parser a
--- choice a = foldr (<|>) a
+optional :: Parser a -> Parser ()
+optional p = Parser $ \ str ->
+    case str of 
+        ""  -> Just ((), str)
+        a   ->
+            case runParser p str of
+                Just(a, rest)   -> Just ((), rest)
+                Nothing         -> Just ((),  str)
+
+
+choice :: [Parser a] -> Parser a
+choice a = foldr1 (<|>) a
 
 -- Like many, but fails if no elements are present
 repeat :: Parser a -> Parser [a]
