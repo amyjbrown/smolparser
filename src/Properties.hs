@@ -1,4 +1,3 @@
-import Smolparser
+import SmolParser
 import Control.Applicative
-
-f = char 'a'
+import qualified Data.Map as Map

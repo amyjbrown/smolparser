@@ -1,6 +1,6 @@
 {-# LANGUAGE InstanceSigs #-}
 
-module SmolParser  where
+module SmolParser where
 
 import Control.Applicative
 
@@ -62,18 +62,37 @@ instance Alternative Parser where
                 Nothing ->
                     runParser p2 str
 
+
+instance Show (Parser a) where
+    show _ = "<parser>"
+
+
+
 run :: Parser a -> String -> Maybe a
 run ps str = do 
     (a,_)  <- runParser ps str
     return a
 
+-- Optionally consumes a token, and if the parser fails, return first arg
+option :: a -> Parser a -> Parser a
+option x p = 
+    Parser $ \ str -> 
+        case str of
+            [] -> Just (x,[])
+            _ -> case runParser p str of
+                Just (a, rest) -> Just (a, rest)
+                Nothing         -> Just (x, str)
+
+
+-- choice :: [Parser a] -> Parser a
+-- choice a = foldr (<|>) a
 
 -- Like many, but fails if no elements are present
 repeat :: Parser a -> Parser [a]
 repeat p = Parser $ \ str ->
   case runParser (many p) str of
-    Just ([], str)  -> Nothing
-    Just (a)   -> Just (a)
+    Just ([], str)  ->  Nothing
+    Just (a)        ->  Just (a)
 
 -- Matches true if element end of string
 -- else Nothing
@@ -119,7 +138,31 @@ hexdigit =
                     || c >= 'A' && c <= 'F'
                     then Just (c, cs)
                     else Nothing  
+-- The first string shall be the input string, the second the output
+-- eg upperCase ("Barfoo", "") -> ("arfoo", "B")
+munch :: (Char -> Bool) -> Parser String
+munch f = 
+    Parser $ \ str ->
+        case _munch f (str, "") of
+            (rest, result)  -> Just (result, rest)
 
+munch1 :: (Char -> Bool) -> Parser String
+munch1 f = 
+    Parser $ \ str ->
+        case _munch f (str, "") of
+            ("", _)         -> Nothing
+            (rest, result)  -> Just (result, rest)
+
+-- REMEMBER, (input, result) !!! 
+_munch :: (Char->Bool) -> (String, String) -> (String, String)
+_munch f ([], a) = ([], a)
+
+_munch f (c:cs,s2) =
+    if f c
+        then _munch f (cs, s2 ++ [c])
+        else (c:cs, s2) -- stop iteration otherwise
+
+_munch f ([], a) = ([], a)
 
 number :: Parser String
 number = SmolParser.repeat digit
@@ -161,3 +204,8 @@ psa `follows` psb =
         --             Just(b, rest') -> Just((a,b), rest')
         --             Nothing        -> Nothing
         --     Nothing -> Nothing
+
+discard :: Parser a -> Parser ()
+discard ps = do
+        ps
+        return ()
