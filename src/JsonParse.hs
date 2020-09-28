@@ -1,6 +1,7 @@
 import SmolParser
 import Control.Applicative
 import qualified Data.Map.Strict as Map
+import System.IO
 
 data JsonValue = 
     JsonObject (Map.Map String JsonValue)
@@ -8,7 +9,8 @@ data JsonValue =
     | JsonNumber Double
     | JsonString String
     | JsonBool Bool
-    | JsonNil 
+    | JsonNil
+    deriving Show
 
 
 -- -- todo create top level json parser
@@ -19,6 +21,22 @@ skipws p1 p2 = do
     whitespace
     b <- p2
     return (a,b)
+
+printResult :: String -> IO ()
+printResult path = do
+    result <- opeAndParseFile path
+    putStrLn $ show result
+    return ()
+
+
+opeAndParseFile :: String -> IO JsonValue
+opeAndParseFile path = do
+    contents <- System.IO.readFile path
+    case run parseFile contents of
+        Just a    -> return a
+        Nothing   -> fail "File was unable to load!"
+
+
 
 parseFile :: Parser JsonValue
 parseFile = jsObject <|> jsArray
@@ -81,7 +99,7 @@ jsString = do
 jsNumber :: Parser JsonValue
 jsNumber = do
     intPart      <- SmolParser.number
-    realPart     <-  option "" (SmolParser.literal "." *> SmolParser.number)
+    realPart     <-  option ".0" (SmolParser.literal "." *> SmolParser.number)
     exponentPart <- option "" jsExponent
     return $ JsonNumber $ read $ intPart ++ "." ++ realPart ++ exponentPart
 
