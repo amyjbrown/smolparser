@@ -3,7 +3,7 @@ import Control.Applicative
 import qualified Data.Map.Strict as Map
 
 data JsonValue = 
-    JsonMap (Map.Map String JsonValue)
+    JsonObject (Map.Map String JsonValue)
     | JsonArray [JsonValue]
     | JsonNumber Double
     | JsonString String
@@ -20,17 +20,20 @@ skipws p1 p2 = do
     b <- p2
     return (a,b)
 
+parseFile :: Parser JsonValue
+parseFile = jsObject <|> jsArray
 
-jsObject :: Parser (Map.Map String String)
+
+jsObject :: Parser JsonValue
 jsObject = do
     char '{'
     whitespace
     (value, values) <- keyValue `skipws` many keyValue
     whitespace
     char '}'
-    return $ Map.fromList (value:values)
+    return $ JsonObject $ Map.fromList (value:values)
     where 
-        keyValue :: Parser (String, String)
+        keyValue :: Parser (String, JsonValue)
         keyValue = do
             key <- jsString
             whitespace
@@ -39,43 +42,48 @@ jsObject = do
             value <- jsValue
             whitespace
             char ','
-            return (key, value)
+            return (extractString key, value)
+        
+        extractString :: JsonValue -> String
+        extractString (JsonString s) = s
+        extractString _              = error "[jsObject()] Attempted to extract string form non JsonString object"
 
 
-jsArray :: Parser [String] -- todo JsonArray
+jsArray :: Parser JsonValue -- todo JsonArray
 jsArray = do
     char '['
     whitespace
     (value, values) <- jsValue `skipws` many (jsValue <* whitespace <* char ',')
     whitespace
     char ']'
-    return (value:values)
+    return $ JsonArray $ value:values
 
-jsValue :: Parser String
-jsValue = jsBool <|> jsNil <|> jsNumber <|> jsString
+jsValue :: Parser JsonValue
+jsValue = jsObject <|> jsArray <|> jsBool <|> jsNil <|> jsNumber <|> jsString
 
-jsBool :: Parser String
+jsBool :: Parser JsonValue
 jsBool = do
     f <- literal "true" <|> literal "false"
-    return f -- for when I refactor it to map onto JsonBool
+    return $ JsonBool $ f == "true"  -- for when I refactor it to map onto JsonBool
 
-jsNil :: Parser String
+jsNil :: Parser JsonValue
 jsNil = do
     literal "nil"
+    return JsonNil
 
-jsString :: Parser String
+jsString :: Parser JsonValue
 jsString = do
     char '\"'
     body <- munch (\c -> c /= '\"')
     char '\"'
-    return body
+    return $ JsonString $ body
 
-jsNumber :: Parser String
+jsNumber :: Parser JsonValue
 jsNumber = do
     intPart      <- SmolParser.number
     realPart     <-  option "" (SmolParser.literal "." *> SmolParser.number)
     exponentPart <- option "" jsExponent
-    return $ intPart ++ "." ++ realPart ++ exponentPart
+    return $ JsonNumber $ read $ intPart ++ "." ++ realPart ++ exponentPart
 
 jsExponent :: Parser String
 jsExponent = do
