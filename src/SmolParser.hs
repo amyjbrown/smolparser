@@ -148,20 +148,28 @@ hexdigit =
                     || c >= 'A' && c <= 'F'
                     then Just (c, cs)
                     else Nothing  
--- The first string shall be the input string, the second the output
--- eg upperCase ("Barfoo", "") -> ("arfoo", "B")
+
+
+-- Return all char's conseuctively fulfil the predicate
+-- Will return empty string if no characters found
+-- example:
+--  run (munch $ upperCase) "ABCdeFG" = "ABC"
+--  run (munch $ upperCase) "0123"    = ""
 munch :: (Char -> Bool) -> Parser String
 munch f = 
     Parser $ \ str ->
         case _munch f (str, "") of
             (rest, result)  -> Just (result, rest)
 
+-- Like munch but will return nothing if 0 following characters fit the predicate
 munch1 :: (Char -> Bool) -> Parser String
 munch1 f = 
     Parser $ \ str ->
         case _munch f (str, "") of
             ("", _)         -> Nothing
             (rest, result)  -> Just (result, rest)
+    
+    where
 
 -- REMEMBER, (input, result) !!! 
 _munch :: (Char->Bool) -> (String, String) -> (String, String)
@@ -182,7 +190,11 @@ hexnumber = SmolParser.repeat hexdigit
 
 char :: Char -> Parser Char
 char g = 
-    Parser $ (\(c:cs) -> if g == c then Just(c, cs) else Nothing)
+    Parser $ \str -> 
+        case str of 
+            (c:cs) ->
+                if g == c then Just(c, cs) else Nothing
+            []     -> Nothing
 
 -- parse a string with n elements
 string :: Int -> Parser String
@@ -192,6 +204,9 @@ string n =
             if length hd == n
                 then  Just (hd,tl)
                 else Nothing
+
+skipws :: Parser ()
+skipws = discard $ many (SmolParser.optional whitespace)
 
 whitespace :: Parser ()
 whitespace = 
