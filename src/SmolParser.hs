@@ -206,7 +206,7 @@ string n =
                 else Nothing
 
 skipws :: Parser ()
-skipws = discard $ many (SmolParser.optional whitespace)
+skipws = SmolParser.optional $ many whitespace
 
 whitespace :: Parser ()
 whitespace = 
