@@ -15,12 +15,7 @@ data JsonValue =
 
 -- -- todo create top level json parser
 -- may replace later
-skipws :: Parser a -> Parser b -> Parser (a,b)
-skipws p1 p2 = do
-    a <- p1
-    whitespace
-    b <- p2
-    return (a,b)
+
 
 printResult :: String -> IO ()
 printResult path = do
@@ -45,21 +40,20 @@ parseFile = jsObject <|> jsArray
 jsObject :: Parser JsonValue
 jsObject = do
     char '{'
-    whitespace
-    (value, values) <- keyValue `skipws` many keyValue
-    whitespace
+    skipws
+    (value, values) <- keyValue `follows` many (char ',' *> keyValue)
+    skipws
     char '}'
     return $ JsonObject $ Map.fromList (value:values)
     where 
         keyValue :: Parser (String, JsonValue)
         keyValue = do
+            skipws
             key <- jsString
-            whitespace
+            skipws
             char ':'
-            whitespace
+            skipws
             value <- jsValue
-            whitespace
-            char ','
             return (extractString key, value)
         
         extractString :: JsonValue -> String
@@ -70,11 +64,20 @@ jsObject = do
 jsArray :: Parser JsonValue -- todo JsonArray
 jsArray = do
     char '['
-    whitespace
-    (value, values) <- jsValue `skipws` many (jsValue <* whitespace <* char ',')
-    whitespace
+    skipws
+    (value, values) <-  jsValue `follows` many jsValue'
+    skipws
     char ']'
     return $ JsonArray $ value:values
+    where 
+        jsValue' :: Parser JsonValue
+        jsValue' = do
+            skipws
+            char ','
+            skipws
+            value <- jsValue
+            return value
+
 
 jsValue :: Parser JsonValue
 jsValue = jsObject <|> jsArray <|> jsBool <|> jsNil <|> jsNumber <|> jsString
