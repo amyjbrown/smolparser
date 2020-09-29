@@ -99,9 +99,9 @@ jsString = do
 jsNumber :: Parser JsonValue
 jsNumber = do
     intPart      <- SmolParser.number
-    realPart     <-  option ".0" (SmolParser.literal "." *> SmolParser.number)
+    realPart     <-  option "0" (SmolParser.literal "." *> SmolParser.number)
     exponentPart <- option "" jsExponent
-    return $ JsonNumber $ read $ intPart ++ "." ++ realPart ++ exponentPart
+    return $ JsonNumber $ read (intPart ++ "." ++ realPart ++ exponentPart)
 
 jsExponent :: Parser String
 jsExponent = do
