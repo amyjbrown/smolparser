@@ -41,20 +41,19 @@ jsObject :: Parser JsonValue
 jsObject = do
     char '{'
     skipws
-    (value, values) <- keyValue `follows` many keyValue
+    (value, values) <- keyValue `follows` many (char ',' *> keyValue)
     skipws
     char '}'
     return $ JsonObject $ Map.fromList (value:values)
     where 
         keyValue :: Parser (String, JsonValue)
         keyValue = do
+            skipws
             key <- jsString
             skipws
             char ':'
             skipws
             value <- jsValue
-            skipws
-            char ','
             return (extractString key, value)
         
         extractString :: JsonValue -> String
@@ -66,7 +65,7 @@ jsArray :: Parser JsonValue -- todo JsonArray
 jsArray = do
     char '['
     skipws
-    (value, values) <- jsValue `follows` many jsValue'
+    (value, values) <-  jsValue `follows` many jsValue'
     skipws
     char ']'
     return $ JsonArray $ value:values
@@ -75,8 +74,8 @@ jsArray = do
         jsValue' = do
             skipws
             char ','
-            value <- jsValue
             skipws
+            value <- jsValue
             return value
 
 
