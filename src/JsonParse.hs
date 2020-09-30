@@ -41,11 +41,7 @@ jsObject :: Parser JsonValue
 jsObject = do
     char '{'
     skipws
-<<<<<<< HEAD
-    (value, values) <- keyValue `follows` many keyValue
-=======
     pairs <- option [] getPairs
->>>>>>> refs/remotes/origin/main
     skipws
     char '}'
     return $ JsonObject (Map.fromList pairs)
@@ -78,11 +74,7 @@ jsArray :: Parser JsonValue -- todo JsonArray
 jsArray = do
     char '['
     skipws
-<<<<<<< HEAD
-    (value, values) <- jsValue `follows` many jsValue'
-=======
     values <-  option [] getValues
->>>>>>> refs/remotes/origin/main
     skipws
     char ']'
     return $ JsonArray (values)
@@ -119,10 +111,11 @@ jsNil = do
 jsString :: Parser JsonValue
 jsString = do
     char '\"'
-    body <- munch (\c -> c /= '\"')
+    body <- characters
     char '\"'
     return $ JsonString $ body
 
+characters
 jsNumber :: Parser JsonValue
 jsNumber = do
     intPart      <- SmolParser.number
