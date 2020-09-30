@@ -41,11 +41,19 @@ jsObject :: Parser JsonValue
 jsObject = do
     char '{'
     skipws
-    (value, values) <- keyValue `follows` many (char ',' *> keyValue)
+    pairs <- option [] getPairs
     skipws
     char '}'
-    return $ JsonObject $ Map.fromList (value:values)
-    where 
+    return $ JsonObject (Map.fromList pairs)
+
+    where
+        getPairs :: Parser [(String, JsonValue)]
+        getPairs = do
+            kv  <- keyValue
+            skipws
+            kvs <- many $ char ',' *> skipws *> keyValue
+            return $ kv:kvs
+
         keyValue :: Parser (String, JsonValue)
         keyValue = do
             skipws
@@ -65,11 +73,17 @@ jsArray :: Parser JsonValue -- todo JsonArray
 jsArray = do
     char '['
     skipws
-    (value, values) <-  jsValue `follows` many jsValue'
+    values <-  option [] getValues
     skipws
     char ']'
-    return $ JsonArray $ value:values
+    return $ JsonArray (values)
     where 
+        getValues :: Parser [JsonValue]
+        getValues = do
+            v <- jsValue
+            vs <- many jsValue'
+            return $ v:vs
+
         jsValue' :: Parser JsonValue
         jsValue' = do
             skipws
@@ -91,13 +105,15 @@ jsNil :: Parser JsonValue
 jsNil = do
     literal "nil"
     return JsonNil
-
+-- TODO on jsString - Handle escapes
+-- Unfortunately I'd have to switch to `Text` for handling unicode, not sure I want to handle that atm
 jsString :: Parser JsonValue
 jsString = do
     char '\"'
     body <- munch (\c -> c /= '\"')
     char '\"'
     return $ JsonString $ body
+
 
 jsNumber :: Parser JsonValue
 jsNumber = do
