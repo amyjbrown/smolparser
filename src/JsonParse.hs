@@ -41,11 +41,23 @@ jsObject :: Parser JsonValue
 jsObject = do
     char '{'
     skipws
+<<<<<<< HEAD
     (value, values) <- keyValue `follows` many keyValue
+=======
+    pairs <- option [] getPairs
+>>>>>>> refs/remotes/origin/main
     skipws
     char '}'
-    return $ JsonObject $ Map.fromList (value:values)
-    where 
+    return $ JsonObject (Map.fromList pairs)
+
+    where
+        getPairs :: Parser [(String, JsonValue)]
+        getPairs = do
+            kv  <- keyValue
+            skipws
+            kvs <- many $ char ',' *> skipws *> keyValue
+            return $ kv:kvs
+
         keyValue :: Parser (String, JsonValue)
         keyValue = do
             key <- jsString
@@ -66,11 +78,21 @@ jsArray :: Parser JsonValue -- todo JsonArray
 jsArray = do
     char '['
     skipws
+<<<<<<< HEAD
     (value, values) <- jsValue `follows` many jsValue'
+=======
+    values <-  option [] getValues
+>>>>>>> refs/remotes/origin/main
     skipws
     char ']'
-    return $ JsonArray $ value:values
+    return $ JsonArray (values)
     where 
+        getValues :: Parser [JsonValue]
+        getValues = do
+            v <- jsValue
+            vs <- many jsValue'
+            return $ v:vs
+
         jsValue' :: Parser JsonValue
         jsValue' = do
             skipws
@@ -92,7 +114,8 @@ jsNil :: Parser JsonValue
 jsNil = do
     literal "nil"
     return JsonNil
-
+-- TODO on jsString - Handle escapes
+-- Unfortunately I'd have to switch to `Text` for handling unicode, not sure I want to handle that atm
 jsString :: Parser JsonValue
 jsString = do
     char '\"'
@@ -100,23 +123,12 @@ jsString = do
     char '\"'
     return $ JsonString $ body
 
-transformString :: Parser String 
-transformString = many $ (
-    literal "\\n" *> pure "\n"
-        <|> literal "\\r"  *> pure "\n"
-        <|> literal "\\t"  *> pure "\t"
-        <|> literal "\\f"  *> pure "\f"
-        <|> literal "\\\"" *> pure "\""
-        <|> literal "\\/"  *> pure "/"
-        )
-
-
 jsNumber :: Parser JsonValue
 jsNumber = do
     intPart      <- SmolParser.number
-    realPart     <-  option ".0" (SmolParser.literal "." *> SmolParser.number)
+    realPart     <-  option "0" (SmolParser.literal "." *> SmolParser.number)
     exponentPart <- option "" jsExponent
-    return $ JsonNumber $ read $ intPart ++ "." ++ realPart ++ exponentPart
+    return $ JsonNumber $ read (intPart ++ "." ++ realPart ++ exponentPart)
 
 jsExponent :: Parser String
 jsExponent = do
