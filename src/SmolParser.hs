@@ -217,6 +217,8 @@ whitespace =
             '\t' -> Just ((), cs)
             _    -> Nothing
 
+
+
 follows :: Parser a -> Parser b -> Parser (a,b)
 psa `follows` psb = 
     Parser $ \str -> do

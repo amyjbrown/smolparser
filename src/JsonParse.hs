@@ -99,6 +99,17 @@ jsString = do
     char '\"'
     return $ JsonString $ body
 
+transformString :: Parser String 
+transformString = many $ (
+    literal "\\n" *> pure "\n"
+        <|> literal "\\r"  *> pure "\n"
+        <|> literal "\\t"  *> pure "\t"
+        <|> literal "\\f"  *> pure "\f"
+        <|> literal "\\\"" *> pure "\""
+        <|> literal "\\/"  *> pure "/"
+        )
+
+
 jsNumber :: Parser JsonValue
 jsNumber = do
     intPart      <- SmolParser.number
