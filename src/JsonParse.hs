@@ -11,17 +11,24 @@ data JsonValue =
     | JsonString String
     | JsonBool Bool
     | JsonNil
-    deriving Show
+    deriving (Show, Eq)
 
 
--- -- todo create top level json parser
+-- todo create top level json parser
 -- may replace later
+t1 :: String
+t1  = "{\"Key\": \"Value\",\
+\ \"key2\": 1, \
+\ \"key3\": nil"
+
+t2 = "[1, 2, 3]"
+
 
 
 printResult :: String -> IO ()
 printResult path = do
     result <- opeAndParseFile path
-    putStrLn $ show result
+    print result
     return ()
 
 
@@ -30,7 +37,7 @@ opeAndParseFile path = do
     contents <- System.IO.readFile path
     case run parseFile contents of
         Just a    -> return a
-        Nothing   -> fail "File was unable to load!"
+        Nothing   -> fail "Parse Error in File!"
 
 
 
@@ -40,6 +47,7 @@ parseFile = jsObject <|> jsArray
 
 jsObject :: Parser JsonValue
 jsObject = do
+    skipws
     char '{'
     skipws
     pairs <- option [] getPairs
@@ -73,6 +81,7 @@ jsObject = do
 
 jsArray :: Parser JsonValue -- todo JsonArray
 jsArray = do
+    skipws
     char '['
     skipws
     values <-  option [] getValues
@@ -90,6 +99,7 @@ jsArray = do
         jsValue' = do
             skipws
             char ','
+            skipws
             value <- jsValue
             skipws
             return value
@@ -125,25 +135,29 @@ characters = do
     return glyphs
 
 character :: Parser Char
-character = do
-    (choice $ map (char) chars) <|> escapes
-    where
-        chars = [
-            chr x | x <- [0x0020..0x10FFFF], 
-            (chr x) /= '\"' || (chr x) /= '\\' 
-            ]
+character = 
+    regular <|> escapes
+    where 
+    regular = Parser $ \ str ->
+        case str of
+            ""       -> Nothing
+            '\"':_   -> Nothing
+            '\\':_   -> Nothing
+            c:rest   -> Just (c, rest) 
 
 escapes :: Parser Char
-escapes = do
-    (literal "\\\"" >> return '\\' )
-    <|> (literal "\\\"" >> return '\"')
-    <|> (literal "\\/"  >> return '/')
-    <|> (literal "\\b"  >> return '\b')
-    <|> (literal "\\f"  >> return '\f')
-    <|> (literal "\\n"  >> return '\n')
-    <|> (literal "\\r"  >> return '\r')
-    <|> (literal "\\t"  >> return '\t')
--- do hex escapes 
+escapes = 
+    choice [
+        literal "\\\"" >> return '\"',
+        literal "\\\\" >> return '\\',
+        literal "\\/"  >> return '/',
+        literal "\\b"  >> return '\b',
+        literal "\\f"  >> return '\f',
+        literal "\\n"  >> return '\n',
+        literal "\\r"  >> return '\r',
+        literal "\\t"  >> return '\t'
+        -- TODO hex codes   
+    ]
 
 jsNumber :: Parser JsonValue
 jsNumber = do
