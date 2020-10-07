@@ -2,6 +2,7 @@ import SmolParser
 import Control.Applicative
 import qualified Data.Map.Strict as Map
 import System.IO
+import Data.Char
 
 data JsonValue = 
     JsonObject (Map.Map String JsonValue)
@@ -115,7 +116,35 @@ jsString = do
     char '\"'
     return $ JsonString $ body
 
-characters
+-- characters :: Parser [String]
+-- characters = some character
+
+characters :: Parser String
+characters = do
+    glyphs <- some character
+    return glyphs
+
+character :: Parser Char
+character = do
+    (choice $ map (char) chars) <|> escapes
+    where
+        chars = [
+            chr x | x <- [0x0020..0x10FFFF], 
+            (chr x) /= '\"' || (chr x) /= '\\' 
+            ]
+
+escapes :: Parser Char
+escapes = do
+    (literal "\\\"" >> return '\\' )
+    <|> (literal "\\\"" >> return '\"')
+    <|> (literal "\\/"  >> return '/')
+    <|> (literal "\\b"  >> return '\b')
+    <|> (literal "\\f"  >> return '\f')
+    <|> (literal "\\n"  >> return '\n')
+    <|> (literal "\\r"  >> return '\r')
+    <|> (literal "\\t"  >> return '\t')
+-- do hex escapes 
+
 jsNumber :: Parser JsonValue
 jsNumber = do
     intPart      <- SmolParser.number

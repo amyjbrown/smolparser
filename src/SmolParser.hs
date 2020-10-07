@@ -88,9 +88,9 @@ optional :: Parser a -> Parser ()
 optional p = Parser $ \ str ->
     case str of 
         ""  -> Just ((), str)
-        a   ->
+        _   ->
             case runParser p str of
-                Just(a, rest)   -> Just ((), rest)
+                Just (_, rest)   -> Just ((), rest)
                 Nothing         -> Just ((),  str)
 
 
@@ -101,7 +101,7 @@ choice a = foldr1 (<|>) a
 repeat :: Parser a -> Parser [a]
 repeat p = Parser $ \ str ->
   case runParser (many p) str of
-    Just ([], str)  ->  Nothing
+    Just ([], _)  ->  Nothing
     Just (a)        ->  Just (a)
 
 -- Matches true if element end of string
@@ -173,7 +173,7 @@ munch1 f =
 
 -- REMEMBER, (input, result) !!! 
 _munch :: (Char->Bool) -> (String, String) -> (String, String)
-_munch f ([], a) = ([], a)
+_munch _ ([], a) = ([], a)
 
 _munch f (c:cs,s2) =
     if f c
