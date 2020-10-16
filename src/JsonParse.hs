@@ -1,8 +1,22 @@
+module JsonParse(
+    JsonValue,
+    printResult,
+    opeAndParseFile,
+    jsValue,
+    jsObject,
+    jsArray,
+    jsNumber,
+    jsString,
+    jsBool,
+    jsNil
+    ) where
+
 import SmolParser
 import Control.Applicative
 import qualified Data.Map.Strict as Map
 import System.IO
 import Data.Char
+
 
 data JsonValue = 
     JsonObject (Map.Map String JsonValue)
@@ -19,7 +33,7 @@ data JsonValue =
 t1 :: String
 t1  = "{\"Key\": \"Value\",\
 \ \"key2\": 1, \
-\ \"key3\": nil"
+\ \"key3\": nil}"
 
 t2 = "[1, 2, 3]"
 
@@ -47,37 +61,52 @@ parseFile = jsObject <|> jsArray
 
 jsObject :: Parser JsonValue
 jsObject = do
-    skipws
+-- OK so the basic syntax is
+-- Object
+--  { ws }
+--  {members}
+-- members
+--  member ("," member)*
+-- Member
+--  string ":" value
+    noMember <|> members
+
+noMember :: Parser JsonValue
+noMember = do
     char '{'
     skipws
-    pairs <- option [] getPairs
+    char '}'
+    return . JsonObject . Map.fromList $ []
+
+members :: Parser JsonValue
+members = do
+    char '{'
+    skipws
+    first <- member
+    rest <- some getRest
     skipws
     char '}'
-    return $ JsonObject (Map.fromList pairs)
+    return . JsonObject . Map.fromList $ first:rest
 
     where
-        getPairs :: Parser [(String, JsonValue)]
-        getPairs = do
-            kv  <- keyValue
+        getRest :: Parser (JsonValue, String)
+        getRest = do
             skipws
-            kvs <- many $ char ',' *> skipws *> keyValue
-            return $ kv:kvs
+            literal ','
 
-        keyValue :: Parser (String, JsonValue)
-        keyValue = do
-            key <- jsString
-            skipws
-            char ':'
-            skipws
-            value <- jsValue
-            skipws
-            char ','
-            return (extractString key, value)
-        
+member :: Parser (String, JsonValue)
+member = do
+    string <- jsString
+    skipws
+    char ':'
+    skipws
+    value <- jsValue
+    return (extractString string, value)
+
+    where 
         extractString :: JsonValue -> String
         extractString (JsonString s) = s
-        extractString _              = error "[jsObject()] Attempted to extract string form non JsonString object"
-
+        -- extractString x = error "extractString passed non-JsonString value: " ++ (show x)
 
 jsArray :: Parser JsonValue -- todo JsonArray
 jsArray = do
