@@ -37,8 +37,6 @@ t1  = "{\"Key\": \"Value\",\
 
 t2 = "[1, 2, 3]"
 
-
-
 printResult :: String -> IO ()
 printResult path = do
     result <- opeAndParseFile path
