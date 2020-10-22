@@ -3,9 +3,12 @@
 module SmolParser where
 
 import Control.Applicative
+import Data.Char
 
 newtype Parser a = 
-    Parser {runParser :: String -> Maybe (a, String)} 
+    Parser {runParser :: String -> Either ErrorMessage (a, String)} 
+
+type ErrorMessage = String
 
 instance Functor Parser where
     fmap :: (a->b) -> Parser a -> Parser b
@@ -20,7 +23,7 @@ instance Functor Parser where
 instance Applicative Parser where
     pure :: a -> Parser a
     pure a = 
-        Parser $ \str -> Just(a, str)
+        Parser $ \str -> Right (a, str)
 
     (<*>) :: Parser (a -> b) -> Parser a -> Parser b
     p1 <*> p2 =
@@ -28,38 +31,32 @@ instance Applicative Parser where
             (f, rest)  <- runParser p1 str
             (a, rest') <- runParser p2 rest
             return ((f a), rest')
-            -- case runParser p1 str of
-                -- Just(f, rest) -> 
-                --     case runParser p2 rest of 
-                --     Just(a, rest') -> Just((f a), rest')
-                --     Nothing        -> Nothing
-                -- Nothing        -> Nothing
 
 instance Monad Parser where
     (>>=) :: Parser a -> (a -> Parser b) -> Parser b -- [String -> Maybe b]
     p >>= f = 
         Parser $ \str ->
-            do 
-                (a, rest) <- runParser p str
-                runParser (f a) rest
-        -- Parser $ 
-        --     \string ->
-        --         case runParser p string of
-        --             Just(a, rest) -> 
-        --                 runParser (f a) rest
-        --             Nothing       -> Nothing
+            case runParser p str of 
+                Right (a, rest) ->
+                    runParser (f a) rest
+                Left error      ->
+                    Left error
+            -- do 
+            --     (a, rest) <- runParser p str
+            --     runParser (f a) rest
+            --     -- TODO - fix this shit
 
 instance Alternative Parser where
     -- The Parser that Always Fails
     empty :: Parser a
-    empty = Parser $ \_ -> Nothing
+    empty = Parser $ \_ -> Left "[empty] gauranteed failre"
 
     (<|>) :: Parser a -> Parser a -> Parser a
     p1 <|> p2 = 
         Parser $ \ str ->
             case runParser p1 str of
-                Just (a, str')    -> Just (a, str')
-                Nothing ->
+                Right (a, str')    -> Right (a, str')
+                Left _ ->
                     runParser p2 str
 
 
@@ -67,8 +64,14 @@ instance Show (Parser a) where
     show _ = "<parser>"
 
 
+errorString :: String -> String
+errorString str = 
+    let l = length str in
+        if l > 25 then
+            take 25 str ++ "..."
+            else str
 
-run :: Parser a -> String -> Maybe a
+run :: Parser a -> String -> Either ErrorMessage a
 run ps str = do 
     (a,_)  <- runParser ps str
     return a
@@ -78,20 +81,20 @@ option :: a -> Parser a -> Parser a
 option x p = 
     Parser $ \ str -> 
         case str of
-            [] -> Just (x,[])
+            [] -> Right (x,[])
             _ -> case runParser p str of
-                Just (a, rest) ->  Just (a, rest)
-                Nothing         -> Just (x, str)
+                Right (a, rest) ->  Right (a, rest)
+                Left _         ->   Right (x, str)
 
 
 optional :: Parser a -> Parser ()
 optional p = Parser $ \ str ->
     case str of 
-        ""  -> Just ((), str)
+        ""  -> Right ((), str)
         _   ->
             case runParser p str of
-                Just (_, rest)   -> Just ((), rest)
-                Nothing         -> Just ((),  str)
+                Right (_, rest)   -> Right ((), rest)
+                Left _            -> Right ((),  str)
 
 
 choice :: [Parser a] -> Parser a
@@ -101,16 +104,16 @@ choice a = foldr1 (<|>) a
 repeat :: Parser a -> Parser [a]
 repeat p = Parser $ \ str ->
   case runParser (many p) str of
-    Just ([], _)  ->  Nothing
-    Just (a)        ->  Just (a)
+    Right ([], str)    ->  Left $ "repeat failed to show as many arguements as necessary at: " ++ (errorString str)
+    Right (a)        ->  Right (a)
 
 -- Matches true if element end of string
 -- else Nothing
 eof :: Parser ()
 eof = Parser $ \ str ->
     if str == []
-        then Just ((),[])
-        else Nothing
+        then Right ((),[])
+        else Left "Failed to match end of file"
 
 
 -- matches and returns the string if it matches,
@@ -123,31 +126,31 @@ literal lit =
             (first, last) = splitAt n str
             in
                 if first == lit then 
-                    Just(lit, last)
+                    Right (lit, last)
                 else 
-                    Nothing
+                    Left $ "[literal] failed to match literal " ++ lit ++ "at: " ++ (errorString str)
 
 digit :: Parser Char
 digit =
     Parser $ \str -> 
         case str of 
-            []  ->  Nothing
+            []  ->  Left "[digit] end of file reached"
             (c:cs) ->
                 if c >= '0' && c <= '9'
-                then Just (c, cs)
-                else Nothing
+                then Right (c, cs)
+                else Left $ "failed to match digit at " ++ (show  c) ++ "(" ++ (show $ ord c) ++ ")" ++ " at: " ++ (errorString str)
 
 hexdigit :: Parser Char
 hexdigit =
     Parser $ \ str ->
         case str of 
-            [] -> Nothing
+            [] -> Left "[hexdigit] end of file reached"
             (c:cs) ->
                 if  c >= '0' && c <= '9' 
                     || c >= 'a' && c <= 'f' 
                     || c >= 'A' && c <= 'F'
-                    then Just (c, cs)
-                    else Nothing  
+                    then Right (c, cs)
+                    else Left $ "[hexdigit] Couldn't match char " ++ (show c) ++ "at: " ++ (errorString str) 
 
 
 -- Return all char's conseuctively fulfil the predicate
@@ -159,15 +162,15 @@ munch :: (Char -> Bool) -> Parser String
 munch f = 
     Parser $ \ str ->
         case _munch f (str, "") of
-            (rest, result)  -> Just (result, rest)
+            (rest, result)  -> Right (result, rest)
 
 -- Like munch but will return nothing if 0 following characters fit the predicate
 munch1 :: (Char -> Bool) -> Parser String
 munch1 f = 
     Parser $ \ str ->
         case _munch f (str, "") of
-            ("", _)         -> Nothing
-            (rest, result)  -> Just (result, rest)
+            ("", str)         -> Left $ "[munch1] failed to munch at: " ++ (errorString str)
+            (rest, result)  -> Right (result, rest)
     
     where
 
@@ -193,8 +196,9 @@ char g =
     Parser $ \str -> 
         case str of 
             (c:cs) ->
-                if g == c then Just(c, cs) else Nothing
-            []     -> Nothing
+                if g == c then Right (c, cs) else Left $ "[char] character " ++ [c] ++ " did not match at: " ++ (errorString str)
+            []     -> 
+                Left $ "[char] reached end of file " 
 
 -- parse a string with n elements
 string :: Int -> Parser String
@@ -202,8 +206,8 @@ string n =
     Parser $ \str ->
         let (hd, tl) = splitAt n str in
             if length hd == n
-                then  Just (hd,tl)
-                else Nothing
+                then  Right (hd,tl)
+                else Left $ "Failed to match " ++ (show n) ++ "chars at:\n\t" ++ (errorString str)
 
 skipws :: Parser ()
 skipws = SmolParser.optional $ many whitespace
@@ -212,10 +216,13 @@ whitespace :: Parser ()
 whitespace = 
     Parser $ \(c:cs) -> 
         case c of
-            ' '  -> Just ((), cs)
-            '\n' -> Just ((), cs)
-            '\t' -> Just ((), cs)
-            _    -> Nothing
+            ' '  -> Right ((), cs)
+            '\n' -> Right ((), cs)
+            '\t' -> Right ((), cs)
+            '\f' -> Right ((), cs)
+            '\v' -> Right ((), cs)
+            '\r' -> Right ((), cs)
+            _    -> Left $ "Failed to match whitespace char with " ++ (show c) ++ "(" ++ (show . ord $ c) ++ ")" ++ "at:\n\t:" ++ (errorString $ c:cs)
 
 
 
