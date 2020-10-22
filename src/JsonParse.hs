@@ -1,7 +1,7 @@
 module JsonParse(
     JsonValue,
     printResult,
-    opeAndParseFile,
+    openAndParseFile,
     jsValue,
     jsObject,
     jsArray,
@@ -39,17 +39,17 @@ t2 = "[1, 2, 3]"
 
 printResult :: String -> IO ()
 printResult path = do
-    result <- opeAndParseFile path
+    result <- openAndParseFile path
     print result
     return ()
 
 
-opeAndParseFile :: String -> IO JsonValue
-opeAndParseFile path = do
+openAndParseFile :: String -> IO JsonValue
+openAndParseFile path = do
     contents <- System.IO.readFile path
     case run parseFile contents of
-        Just a    -> return a
-        Nothing   -> fail "Parse Error in File!"
+        Right a    -> return a
+        Left str   -> fail str
 
 
 
@@ -87,10 +87,12 @@ members = do
     return . JsonObject . Map.fromList $ first:rest
 
     where
-        getRest :: Parser (JsonValue, String)
+        getRest :: Parser (String, JsonValue)
         getRest = do
             skipws
-            literal ','
+            char ','
+            skipws
+            member
 
 member :: Parser (String, JsonValue)
 member = do
@@ -167,10 +169,10 @@ character =
     where 
     regular = Parser $ \ str ->
         case str of
-            ""       -> Nothing
-            '\"':_   -> Nothing
-            '\\':_   -> Nothing
-            c:rest   -> Just (c, rest) 
+            ""       -> Left "[character] you shouldn't be seeing this"
+            '\"':_   -> Left "[character] you shouldn't be seeing this"
+            '\\':_   -> Left "[character] you shouldn't be seeing this"
+            c:rest   -> Right (c, rest) 
 
 escapes :: Parser Char
 escapes = 

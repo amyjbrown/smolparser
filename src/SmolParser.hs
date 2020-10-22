@@ -56,8 +56,10 @@ instance Alternative Parser where
         Parser $ \ str ->
             case runParser p1 str of
                 Right (a, str')    -> Right (a, str')
-                Left _ ->
-                    runParser p2 str
+                Left err ->
+                    case runParser p2 str of
+                        Right (a, str'')  -> Right (a, str'')
+                        Left err'         -> Left $ "(<|>) failed:\n\t" ++ err ++ "\nthen\n\t" ++ err'
 
 
 instance Show (Parser a) where
@@ -68,8 +70,8 @@ errorString :: String -> String
 errorString str = 
     let l = length str in
         if l > 25 then
-            take 25 str ++ "..."
-            else str
+            "'" ++ (take 25 str ++ "...") ++ "'"
+            else '\'':str ++ "'"
 
 run :: Parser a -> String -> Either ErrorMessage a
 run ps str = do 
@@ -169,7 +171,7 @@ munch1 :: (Char -> Bool) -> Parser String
 munch1 f = 
     Parser $ \ str ->
         case _munch f (str, "") of
-            ("", str)         -> Left $ "[munch1] failed to munch at: " ++ (errorString str)
+            ("", str)         -> Left $ "[munch1] failed to munch at:\n\t" ++ (errorString str)
             (rest, result)  -> Right (result, rest)
     
     where
@@ -183,7 +185,7 @@ _munch f (c:cs,s2) =
         then _munch f (cs, s2 ++ [c])
         else (c:cs, s2) -- stop iteration otherwise
 
-_munch f ([], a) = ([], a)
+_munch _ ([], a) = ([], a)
 
 number :: Parser String
 number = SmolParser.repeat digit
@@ -196,9 +198,19 @@ char g =
     Parser $ \str -> 
         case str of 
             (c:cs) ->
-                if g == c then Right (c, cs) else Left $ "[char] character " ++ [c] ++ " did not match at: " ++ (errorString str)
+                if g == c 
+                    then Right (c, cs) 
+                    else Left $ bigOlError (c, g) str
             []     -> 
                 Left $ "[char] reached end of file " 
+
+    where
+        bigOlError :: (Char, Char) -> String -> String
+        bigOlError (actual, expected) str = 
+            "[char] expected '" ++ [expected] ++ "'(" ++ (show . ord $ expected) ++ ") "
+            ++ "recieved '" ++ [actual] ++ "'(" ++ (show . ord $ actual) ++ ") at:\n\t" ++ (errorString str)
+
+
 
 -- parse a string with n elements
 string :: Int -> Parser String
