@@ -180,8 +180,6 @@ _munch f (c:cs,s2) =
         then _munch f (cs, s2 ++ [c])
         else (c:cs, s2) -- stop iteration otherwise
 
-_munch f ([], a) = ([], a)
-
 number :: Parser String
 number = SmolParser.repeat digit
 
